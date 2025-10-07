@@ -33,7 +33,7 @@ ingest = [
 ]
 
 [project.scripts]
-nfl-model = "nfl_model.cli:app"
+nfl-model = "nfl_model.cli:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
