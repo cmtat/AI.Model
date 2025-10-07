@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Dict, Iterable, Optional, Sequence
 
 import pandas as pd
+import warnings
 
 from . import data_sources
 from .data_sources import DataSourceError, MySportsFeedsCredentials
@@ -84,8 +85,17 @@ def fetch_data_bundle(config: DataIngestionConfig) -> Dict[str, pd.DataFrame]:
     bundle["injuries"] = data_sources.load_injuries(config.seasons)
     bundle["team_metadata"] = data_sources.load_team_metadata()
     bundle["scoring_lines"] = data_sources.load_scoring_lines(config.seasons)
-    bundle["elo"] = data_sources.fetch_fivethirtyeight_elo()
-    bundle["qb_elo"] = data_sources.fetch_fivethirtyeight_qb_adjustments()
+    try:
+        bundle["elo"] = data_sources.fetch_fivethirtyeight_elo()
+    except DataSourceError as exc:
+        warnings.warn(f"Failed to fetch FiveThirtyEight Elo: {exc}")
+        bundle["elo"] = pd.DataFrame()
+
+    try:
+        bundle["qb_elo"] = data_sources.fetch_fivethirtyeight_qb_adjustments()
+    except DataSourceError as exc:
+        warnings.warn(f"Failed to fetch FiveThirtyEight QB Elo: {exc}")
+        bundle["qb_elo"] = pd.DataFrame()
 
     if config.odds_api_key:
         bundle["odds"] = data_sources.fetch_the_odds_api(

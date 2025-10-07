@@ -12,8 +12,14 @@ from typing import Dict, Iterable, Optional, Sequence
 import pandas as pd
 import requests
 
-FIVETHIRTYEIGHT_ELO_URL = "https://projects.fivethirtyeight.com/nfl-api/nfl_elo.csv"
-FIVETHIRTYEIGHT_QB_ELO_URL = "https://projects.fivethirtyeight.com/nfl-api/qbelo.csv"
+FIVETHIRTYEIGHT_ELO_URLS = [
+    "https://projects.fivethirtyeight.com/nfl-api/nfl_elo.csv",
+    "https://raw.githubusercontent.com/fivethirtyeight/data/master/nfl-elo/nfl_elo.csv",
+]
+FIVETHIRTYEIGHT_QB_ELO_URLS = [
+    "https://projects.fivethirtyeight.com/nfl-api/qbelo.csv",
+    "https://raw.githubusercontent.com/fivethirtyeight/data/master/nfl-elo/qbelo.csv",
+]
 THE_ODDS_API_BASE = "https://api.the-odds-api.com/v4"
 MYSPORTSFEEDS_BASE = "https://api.mysportsfeeds.com/v2.1/pull/nfl"
 OPEN_METEO_ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
@@ -85,18 +91,37 @@ def load_scoring_lines(seasons: Sequence[int]) -> pd.DataFrame:
     return import_sc_lines(list(seasons))
 
 
+def _fetch_csv_from_urls(urls: Sequence[str], context: str) -> pd.DataFrame:
+    errors: List[str] = []
+    headers = {"User-Agent": "nfl-model/0.1 (https://github.com/)"}  # polite UA
+    for url in urls:
+        try:
+            response = requests.get(url, timeout=30, headers=headers)
+            _ensure_success(response, context)
+        except DataSourceError as exc:
+            errors.append(f"{url}: {exc}")
+            continue
+
+        text = response.text
+        if not text or text.lstrip().startswith("<"):
+            errors.append(f"{url}: unexpected non-CSV response")
+            continue
+        try:
+            return pd.read_csv(StringIO(text))
+        except Exception as exc:  # pragma: no cover - defensive fallback
+            errors.append(f"{url}: {exc}")
+            continue
+    raise DataSourceError(f"{context} download failed. Attempts: {errors}")
+
+
 def fetch_fivethirtyeight_elo() -> pd.DataFrame:
     """Download FiveThirtyEight Elo ratings."""
-    response = requests.get(FIVETHIRTYEIGHT_ELO_URL, timeout=30)
-    _ensure_success(response, "FiveThirtyEight Elo")
-    return pd.read_csv(StringIO(response.text))
+    return _fetch_csv_from_urls(FIVETHIRTYEIGHT_ELO_URLS, "FiveThirtyEight Elo")
 
 
 def fetch_fivethirtyeight_qb_adjustments() -> pd.DataFrame:
     """Download FiveThirtyEight QB Elo adjustments."""
-    response = requests.get(FIVETHIRTYEIGHT_QB_ELO_URL, timeout=30)
-    _ensure_success(response, "FiveThirtyEight QB Elo")
-    return pd.read_csv(StringIO(response.text))
+    return _fetch_csv_from_urls(FIVETHIRTYEIGHT_QB_ELO_URLS, "FiveThirtyEight QB Elo")
 
 
 def fetch_the_odds_api(
