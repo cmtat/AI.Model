@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
 from typing import Dict, Iterable, Optional, Sequence
+import os
 import warnings
 
 import pandas as pd
@@ -141,6 +142,25 @@ def load_scoring_lines(seasons: Sequence[int]) -> pd.DataFrame:
     return pd.concat(frames, ignore_index=True)
 
 
+def _fetch_local_or_env(context: str) -> Optional[pd.DataFrame]:
+    """Return dataframe from env-defined snapshot if available."""
+    path_override = os.environ.get(f"{context.upper().replace(' ', '_')}_PATH")
+    url_override = os.environ.get(f"{context.upper().replace(' ', '_')}_URL")
+
+    if path_override:
+        file_path = Path(path_override).expanduser()
+        if file_path.exists():
+            return pd.read_csv(file_path)
+    if url_override:
+        try:
+            response = requests.get(url_override, timeout=30)
+            _ensure_success(response, context)
+            return pd.read_csv(StringIO(response.text))
+        except Exception:
+            warnings.warn(f"Failed to load {context} from override URL.")
+    return None
+
+
 def _fetch_csv_from_urls(urls: Sequence[str], context: str) -> pd.DataFrame:
     errors: List[str] = []
     headers = {"User-Agent": "nfl-model/0.1 (https://github.com/)"}  # polite UA
@@ -166,11 +186,17 @@ def _fetch_csv_from_urls(urls: Sequence[str], context: str) -> pd.DataFrame:
 
 def fetch_fivethirtyeight_elo() -> pd.DataFrame:
     """Download FiveThirtyEight Elo ratings."""
+    local_df = _fetch_local_or_env("elo_snapshot")
+    if local_df is not None:
+        return local_df
     return _fetch_csv_from_urls(FIVETHIRTYEIGHT_ELO_URLS, "FiveThirtyEight Elo")
 
 
 def fetch_fivethirtyeight_qb_adjustments() -> pd.DataFrame:
     """Download FiveThirtyEight QB Elo adjustments."""
+    local_df = _fetch_local_or_env("qb_elo_snapshot")
+    if local_df is not None:
+        return local_df
     return _fetch_csv_from_urls(FIVETHIRTYEIGHT_QB_ELO_URLS, "FiveThirtyEight QB Elo")
 
 

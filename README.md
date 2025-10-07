@@ -132,6 +132,16 @@ Prefer a graphical interface? Install the UI extras and launch Streamlit:
 
 The Streamlit workbench mirrors the CLI flow—configure seasons, optional API keys, and output locations in the sidebar, then step through fetching data, training, and generating predictions. Download buttons surface the resulting CSVs directly from the browser.
 
+> **Tip:** FiveThirtyEight’s live Elo feeds are currently unreliable. Host a snapshot yourself and point the tooling at it with environment overrides before running `fetch-data` or launching Streamlit:
+> ```bash
+> export ELO_SNAPSHOT_URL="https://your-host/elo_snapshot.csv"
+> export QB_ELO_SNAPSHOT_URL="https://your-host/qb_elo_snapshot.csv"
+> # or local files
+> export ELO_SNAPSHOT_PATH="/path/to/elo_snapshot.csv"
+> export QB_ELO_SNAPSHOT_PATH="/path/to/qb_elo_snapshot.csv"
+> ```
+> If you upload a CSV through the Streamlit sidebar, it is stored automatically in `data/raw/elo.csv` for future runs.
+
 ### Optional YAML Configuration
 Override defaults by supplying a YAML file via `--config`:
 ```yaml
