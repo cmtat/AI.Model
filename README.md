@@ -35,17 +35,25 @@ An end-to-end Python 3.12 project for training, evaluating, and operationalizing
    python -m venv .venv
    source .venv/bin/activate
    pip install -e ".[dev]"
+   # Include ingest extras when pulling external feeds:
+   # pip install -e ".[dev,ingest]"
    ```
 2. **Fetch source data (optional)**
    ```bash
    nfl-model fetch-data --season 2023 --season 2024 --output-dir data/raw
    ```
    Add `--odds-api-key` or rely on env vars (`THE_ODDS_API_KEY`, `MYSPORTSFEEDS_USERNAME`, `MYSPORTSFEEDS_PASSWORD`) to enable premium feeds.
-3. **Train and evaluate**
+3. **Prepare a modeling dataset (optional)**
    ```bash
-   nfl-model train --data-path data/sample_games.csv --output-dir output
+   nfl-model prepare-data --raw-dir data/raw --output-path data/modeling_games.csv --season 2023 --season 2024
    ```
-4. **Generate predictions and value bets**
+   The resulting CSV includes derived features (Elo, prior win flags) expected by the model pipeline.
+4. **Train and evaluate**
+   ```bash
+   nfl-model train --data-path data/modeling_games.csv --output-dir output
+   ```
+   For smoke tests or demos, `data/sample_games.csv` remains available.
+5. **Generate predictions and value bets**
    ```bash
    nfl-model predict --data-path data/sample_games.csv --output-dir output --odds-column closing_odds
    ```
@@ -77,7 +85,16 @@ gb_lambeau,44.5013,-88.0622,2023-09-10,2023-09-10,temperature_2m,precipitation
 Then run:
 ```bash
 nfl-model fetch-data --season 2023 --weather-locations weather.csv
+nfl-model prepare-data --raw-dir data/raw --output-path data/modeling_games.csv
 ```
+
+## Preparing Features
+`nfl-model prepare-data` merges schedule, betting, and FiveThirtyEight Elo feeds into a modeling-ready table with:
+- Binary target `home_team_win` and prior-game win indicators.
+- Home/away moneylines and spreads suitable for the default feature configuration.
+- Elo strength differentials (`elo_home_pre`, `elo_prob_home`) and optional weather metrics when present.
+
+Use this CSV directly with `nfl-model train` or extend the script to append custom features.
 
 ### Optional YAML Configuration
 Override defaults by supplying a YAML file via `--config`:

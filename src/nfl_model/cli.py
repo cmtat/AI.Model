@@ -10,6 +10,7 @@ from typing import List, Optional
 import typer
 
 from . import pipeline
+from .dataset import build_modeling_dataset
 from .ingest import DataIngestionConfig, DataSourceError, WeatherRequest, fetch_data_bundle
 
 app = typer.Typer(help="NFL outcome modeling utilities.")
@@ -132,6 +133,39 @@ def fetch_data(
     typer.secho("Datasets retrieved:", fg=typer.colors.BLUE)
     for name, frame in bundle.items():
         typer.echo(f"  {name}: {len(frame)} rows")
+
+
+@app.command()
+def prepare_data(
+    raw_dir: Path = typer.Argument(Path("data/raw"), help="Directory of raw data tables."),
+    output_path: Path = typer.Option(
+        Path("data/modeling_games.csv"),
+        "--output-path",
+        "-o",
+        help="Where to write the prepared modeling dataset (CSV).",
+    ),
+    season: List[int] = typer.Option(
+        (),
+        "--season",
+        "-s",
+        help="Season(s) to include (repeat for multiple). Defaults to all seasons present.",
+    ),
+    game_type: List[str] = typer.Option(
+        ("REG",),
+        "--game-type",
+        "-g",
+        help="Game types to include (e.g., REG, POST). Repeat to include multiple.",
+    ),
+) -> None:
+    """Transform raw source tables into a modeling-ready CSV."""
+    seasons = list(season) or None
+    game_types = list(game_type) or None
+    typer.secho("Building modeling dataset...", fg=typer.colors.GREEN)
+    dataset = build_modeling_dataset(raw_dir, seasons=seasons, game_types=game_types)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    dataset.to_csv(output_path, index=False)
+    typer.secho(f"Dataset written to {output_path}", fg=typer.colors.BLUE)
+    typer.echo(f"Rows: {len(dataset)}, Columns: {len(dataset.columns)}")
 
 
 @app.command()

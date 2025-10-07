@@ -29,6 +29,14 @@ class ColumnConfig:
             "away_spread",
             "home_team_prev_win",
             "away_team_prev_win",
+            "home_rest",
+            "away_rest",
+            "temp",
+            "wind",
+            "elo_home_pre",
+            "elo_away_pre",
+            "elo_prob_home",
+            "qbelo_prob_home",
         ]
     )
     odds: Optional[str] = "home_moneyline"

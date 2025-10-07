@@ -1,6 +1,6 @@
-season,week,home_team,away_team,home_team_score,away_team_score,home_moneyline,away_moneyline,home_spread,away_spread,home_team_prev_win,away_team_prev_win,divisional_game,home_team_win
-2023,1,Kansas City Chiefs,Detroit Lions,20,21,-260,210,-6.5,6.5,1,1,0,0
-2023,1,Buffalo Bills,New York Jets,16,22,-140,120,-2.5,2.5,1,0,1,0
-2023,2,Kansas City Chiefs,Jacksonville Jaguars,17,9,-175,150,-3.5,3.5,0,1,0,1
-2023,2,Jacksonville Jaguars,Kansas City Chiefs,9,17,150,-175,3.5,-3.5,1,0,0,0
-2023,2,Miami Dolphins,New England Patriots,24,17,-160,135,-3,3,1,0,1,1
+season,week,home_team,away_team,home_team_score,away_team_score,home_moneyline,away_moneyline,home_spread,away_spread,home_team_prev_win,away_team_prev_win,divisional_game,home_rest,away_rest,temp,wind,elo_home_pre,elo_away_pre,elo_prob_home,qbelo_prob_home,closing_odds,home_team_win
+2023,1,Kansas City Chiefs,Detroit Lions,20,21,-260,210,-6.5,6.5,1,1,0,10,7,75,5,1660,1540,0.72,0.70,-260,0
+2023,1,Buffalo Bills,New York Jets,16,22,-140,120,-2.5,2.5,1,0,1,7,7,68,12,1605,1580,0.61,0.58,-140,0
+2023,2,Kansas City Chiefs,Jacksonville Jaguars,17,9,-175,150,-3.5,3.5,0,1,0,10,9,88,6,1645,1565,0.65,0.63,-175,1
+2023,2,Jacksonville Jaguars,Kansas City Chiefs,9,17,150,-175,3.5,-3.5,1,0,0,9,10,84,4,1565,1645,0.42,0.40,150,0
+2023,2,Miami Dolphins,New England Patriots,24,17,-160,135,-3,3,1,0,1,7,7,72,8,1588,1530,0.57,0.55,-160,1

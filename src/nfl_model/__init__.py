@@ -10,6 +10,9 @@ __all__ = [
     "data",
     "features",
     "model",
+    "data_sources",
+    "ingest",
+    "dataset",
     "pipeline",
     "cli",
 ]
