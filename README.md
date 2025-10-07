@@ -96,6 +96,26 @@ nfl-model prepare-data --raw-dir data/raw --output-path data/modeling_games.csv
 
 Use this CSV directly with `nfl-model train` or extend the script to append custom features.
 
+## Full Season Workflow (e.g., 2025)
+1. **Fetch raw data covering training + target seasons**
+   ```bash
+   nfl-model fetch-data --season 2018 --end-season 2025 --output-dir data/raw
+   ```
+   (Adjust the start year for the amount of history you want.)
+2. **Run the season orchestrator**
+   ```bash
+   nfl-model season-run \
+     --train-start 2018 \
+     --train-end 2024 \
+     --target-season 2025 \
+     --raw-dir data/raw \
+     --artifact-dir output/season_2025
+   ```
+   This command writes:
+   - `output/season_2025/training_2018_2024.csv` – dataset used for training
+   - `output/season_2025/model/` – model artifacts + metrics
+   - `output/season_2025/predictions_2025/` – 2025 schedule scored by the trained model
+
 ### Optional YAML Configuration
 Override defaults by supplying a YAML file via `--config`:
 ```yaml

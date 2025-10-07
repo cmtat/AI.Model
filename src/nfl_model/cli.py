@@ -300,6 +300,91 @@ def predict(
         click.echo(f"  {name}: {path}")
 
 
+@cli.command("season-run")
+@click.option("--train-start", type=int, required=True, help="First season to include in the training dataset.")
+@click.option("--train-end", type=int, required=True, help="Last season to include in the training dataset.")
+@click.option("--target-season", type=int, required=True, help="Season to score for predictions (e.g., 2025).")
+@click.option(
+    "--raw-dir",
+    type=click.Path(path_type=Path),
+    default=Path("data/raw"),
+    show_default=True,
+    help="Directory containing fetched raw datasets.",
+)
+@click.option(
+    "--artifact-dir",
+    type=click.Path(path_type=Path),
+    default=None,
+    help="Directory to write intermediate artifacts (defaults to output/season_<target>).",
+)
+@click.option(
+    "--config",
+    type=click.Path(path_type=Path, exists=True),
+    default=None,
+    help="Optional config YAML path for both training and prediction stages.",
+)
+def season_run(
+    train_start: int,
+    train_end: int,
+    target_season: int,
+    raw_dir: Path,
+    artifact_dir: Optional[Path],
+    config: Optional[Path],
+) -> None:
+    """Full-season workflow: prepare training data, train, and score a target season."""
+
+    if train_end < train_start:
+        raise click.BadParameter("--train-end must be greater than or equal to --train-start.")
+
+    seasons_train = list(range(train_start, train_end + 1))
+    artifact_root = artifact_dir or Path(f"output/season_{target_season}")
+    artifact_root.mkdir(parents=True, exist_ok=True)
+
+    click.secho(
+        f"Preparing training dataset for seasons {train_start}-{train_end}...",
+        fg="green",
+    )
+    training_df = build_modeling_dataset(raw_dir, seasons=seasons_train)
+    if training_df.empty:
+        raise click.ClickException(
+            "Training dataset is empty. Ensure raw data covers the requested seasons."
+        )
+    training_csv = artifact_root / f"training_{train_start}_{train_end}.csv"
+    training_df.to_csv(training_csv, index=False)
+
+    model_dir = artifact_root / "model"
+    click.secho("Training model...", fg="green")
+    train_artifacts = pipeline.train_and_evaluate(training_csv, model_dir, config)
+    model_path = Path(train_artifacts["model_path"])
+
+    click.secho(f"Building scoring dataset for season {target_season}...", fg="green")
+    scoring_df = build_modeling_dataset(raw_dir, seasons=[target_season])
+    if scoring_df.empty:
+        click.secho(
+            f"No games found for season {target_season}. Skipping prediction step.", fg="yellow"
+        )
+        click.echo(f"Training outputs located in {model_dir}")
+        return
+
+    scoring_csv = artifact_root / f"season_{target_season}_games.csv"
+    scoring_df.to_csv(scoring_csv, index=False)
+    predictions_dir = artifact_root / f"predictions_{target_season}"
+    prediction_artifacts = pipeline.generate_predictions(
+        scoring_csv,
+        model_path,
+        predictions_dir,
+        config,
+        odds_column=None,
+    )
+
+    click.secho("Season workflow complete.", fg="green")
+    click.echo(f"Training dataset: {training_csv}")
+    click.echo(f"Model metrics: {train_artifacts['metrics_path']}")
+    click.echo(f"Predictions: {prediction_artifacts.get('predictions_path', 'N/A')}")
+    if prediction_artifacts.get("value_bets_path"):
+        click.echo(f"Value bets: {prediction_artifacts['value_bets_path']}")
+
+
 def main() -> None:
     """Entry point for the CLI console script."""
     cli()
