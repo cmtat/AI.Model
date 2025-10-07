@@ -22,6 +22,7 @@ An end-to-end Python 3.12 project for training, evaluating, and operationalizing
 │       ├── model.py          # Model training and evaluation
 │       └── pipeline.py       # High-level orchestration
 ├── tests/
+│   ├── test_ingest.py
 │   └── test_pipeline.py
 ├── .github/workflows/
 │   └── retrain.yml           # CI automation for retraining
@@ -35,11 +36,16 @@ An end-to-end Python 3.12 project for training, evaluating, and operationalizing
    source .venv/bin/activate
    pip install -e ".[dev]"
    ```
-2. **Train and evaluate**
+2. **Fetch source data (optional)**
+   ```bash
+   nfl-model fetch-data --season 2023 --season 2024 --output-dir data/raw
+   ```
+   Add `--odds-api-key` or rely on env vars (`THE_ODDS_API_KEY`, `MYSPORTSFEEDS_USERNAME`, `MYSPORTSFEEDS_PASSWORD`) to enable premium feeds.
+3. **Train and evaluate**
    ```bash
    nfl-model train --data-path data/sample_games.csv --output-dir output
    ```
-3. **Generate predictions and value bets**
+4. **Generate predictions and value bets**
    ```bash
    nfl-model predict --data-path data/sample_games.csv --output-dir output --odds-column closing_odds
    ```
@@ -50,6 +56,28 @@ Outputs include model artifacts, evaluation metrics, and value bet CSVs under th
 - CSV file with historical games, including target column `home_team_win` (1 if home team won, 0 otherwise).
 - Example columns demonstrated in `data/sample_games.csv`; extend as needed with additional features.
 - Odds columns (moneyline) are optional for training but required for value bet calculations.
+
+## Data Ingestion Sources
+The `fetch-data` command stitches together the data sources below. Extend or disable any by passing configuration flags.
+
+| Source | Purpose | Notes |
+| --- | --- | --- |
+| `nfl_data_py` | Schedules, team metadata, weekly player stats, injuries, betting lines | Install with `pip install .[ingest]` (Python ≤3.11) or pin a compatible release. |
+| FiveThirtyEight NFL Elo | Team strength, QB adjustments | No auth required. |
+| The Odds API | Real-time moneyline/spread/total markets | Require API key via `--odds-api-key` or `THE_ODDS_API_KEY`. |
+| MySportsFeeds | Injury reports, roster updates | Provide `--mysportsfeeds-username` + `--mysportsfeeds-password` and `--mysportsfeeds-season`. |
+| Open-Meteo API | Weather snapshots for outdoor stadiums | Supply CSV via `--weather-locations`. |
+| Action Network (optional) | Public betting percentages | Enable with `--include-action-network`; set `--action-network-user-agent` if blocked. |
+
+Sample weather CSV (`weather.csv`):
+```csv
+label,latitude,longitude,start_date,end_date,hourly
+gb_lambeau,44.5013,-88.0622,2023-09-10,2023-09-10,temperature_2m,precipitation
+```
+Then run:
+```bash
+nfl-model fetch-data --season 2023 --weather-locations weather.csv
+```
 
 ### Optional YAML Configuration
 Override defaults by supplying a YAML file via `--config`:
