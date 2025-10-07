@@ -40,7 +40,7 @@ An end-to-end Python 3.12 project for training, evaluating, and operationalizing
    ```
 2. **Fetch source data (optional)**
    ```bash
-   nfl-model fetch-data --season 2023 --season 2024 --output-dir data/raw
+   nfl-model fetch-data --season 2023 --end-season 2024 --output-dir data/raw
    ```
    Add `--odds-api-key` or rely on env vars (`THE_ODDS_API_KEY`, `MYSPORTSFEEDS_USERNAME`, `MYSPORTSFEEDS_PASSWORD`) to enable premium feeds.
 3. **Prepare a modeling dataset (optional)**

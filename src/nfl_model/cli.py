@@ -5,9 +5,11 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
+import re
 from typing import List, Optional
 
 import typer
+from click._utils import UNSET
 
 from . import pipeline
 from .dataset import build_modeling_dataset
@@ -53,66 +55,103 @@ def _parse_weather_file(path: Path) -> List[WeatherRequest]:
     return requests
 
 
+def _parse_season_values(raw: Optional[str], required: bool = False) -> List[int]:
+    if raw is None:
+        if required:
+            raise typer.BadParameter("Provide at least one --season value.")
+        return []
+    tokens = [token for token in re.split(r"[\s,]+", raw.strip()) if token]
+    if not tokens:
+        if required:
+            raise typer.BadParameter("Provide at least one --season value.")
+        return []
+    try:
+        return [int(token) for token in tokens]
+    except ValueError as exc:
+        raise typer.BadParameter("Season values must be integers.") from exc
+
+
 @app.command()
 def fetch_data(
-    season: List[int] = typer.Option(
+    season_start: int = typer.Option(
         ...,
         "--season",
         "-s",
-        help="Season(s) to ingest (repeat for multiple years).",
+        help="Starting season to ingest (e.g., 2023).",
+        flag_value=UNSET,
+    ),
+    season_end: Optional[int] = typer.Option(
+        None,
+        "--end-season",
+        "-e",
+        help="Optional final season (inclusive). Defaults to the starting season.",
+        flag_value=UNSET,
     ),
     output_dir: Path = typer.Option(
         Path("data/raw"),
         "--output-dir",
         "-o",
         help="Directory to store fetched datasets.",
+        flag_value=UNSET,
     ),
     odds_api_key: Optional[str] = typer.Option(
         None,
         "--odds-api-key",
         envvar="THE_ODDS_API_KEY",
         help="The Odds API key (env THE_ODDS_API_KEY).",
+        flag_value=UNSET,
     ),
     mysportsfeeds_season: Optional[str] = typer.Option(
         None,
         "--mysportsfeeds-season",
         help="Season string for MySportsFeeds (e.g., 2024-2025-regular).",
+        flag_value=UNSET,
     ),
     mysportsfeeds_username: Optional[str] = typer.Option(
         None,
         "--mysportsfeeds-username",
         envvar="MYSPORTSFEEDS_USERNAME",
         help="MySportsFeeds API username.",
+        flag_value=UNSET,
     ),
     mysportsfeeds_password: Optional[str] = typer.Option(
         None,
         "--mysportsfeeds-password",
         envvar="MYSPORTSFEEDS_PASSWORD",
         help="MySportsFeeds API password or token.",
+        flag_value=UNSET,
     ),
     weather_locations: Optional[Path] = typer.Option(
         None,
         "--weather-locations",
         help="CSV describing weather queries (latitude,longitude,start_date,end_date,...).",
+        flag_value=UNSET,
     ),
     include_action_network: bool = typer.Option(
         False,
-        "--include-action-network/--skip-action-network",
+        "--include-action-network",
         help="Fetch Action Network public betting data.",
+        is_flag=True,
     ),
     action_network_user_agent: Optional[str] = typer.Option(
         None,
         "--action-network-user-agent",
         help="Custom User-Agent header for Action Network requests.",
+        flag_value=UNSET,
     ),
 ) -> None:
     """Fetch and persist external datasets required for modeling."""
+    terminal_season = season_end if season_end is not None else season_start
+    if terminal_season < season_start:
+        raise typer.BadParameter("--end-season must be >= --season.")
+    season_values = list(range(season_start, terminal_season + 1))
+
     weather_requests: List[WeatherRequest] = []
     if weather_locations:
         weather_requests = _parse_weather_file(weather_locations)
 
     config = DataIngestionConfig(
-        seasons=season,
+        seasons=season_values,
         output_dir=output_dir,
         odds_api_key=odds_api_key,
         mysportsfeeds_season=mysportsfeeds_season,
@@ -143,22 +182,27 @@ def prepare_data(
         "--output-path",
         "-o",
         help="Where to write the prepared modeling dataset (CSV).",
+        flag_value=UNSET,
     ),
-    season: List[int] = typer.Option(
-        (),
+    season: Optional[str] = typer.Option(
+        None,
         "--season",
         "-s",
-        help="Season(s) to include (repeat for multiple). Defaults to all seasons present.",
+        help="Season(s) to include (comma or space separated). Defaults to all seasons present.",
+        flag_value=UNSET,
     ),
     game_type: List[str] = typer.Option(
         ("REG",),
         "--game-type",
         "-g",
         help="Game types to include (e.g., REG, POST). Repeat to include multiple.",
+        is_flag=False,
+        flag_value=UNSET,
     ),
 ) -> None:
     """Transform raw source tables into a modeling-ready CSV."""
-    seasons = list(season) or None
+    seasons_list = _parse_season_values(season, required=False)
+    seasons = seasons_list or None
     game_types = list(game_type) or None
     typer.secho("Building modeling dataset...", fg=typer.colors.GREEN)
     dataset = build_modeling_dataset(raw_dir, seasons=seasons, game_types=game_types)
@@ -171,8 +215,8 @@ def prepare_data(
 @app.command()
 def train(
     data_path: Path = typer.Argument(..., help="Path to historical training data CSV."),
-    output_dir: Path = typer.Option(Path("output"), help="Directory to write model artifacts."),
-    config: Optional[Path] = typer.Option(None, "--config", "-c", help="Optional config YAML path."),
+    output_dir: Path = typer.Option(Path("output"), help="Directory to write model artifacts.", flag_value=UNSET),
+    config: Optional[Path] = typer.Option(None, "--config", "-c", help="Optional config YAML path.", flag_value=UNSET),
 ) -> None:
     """Train and evaluate the model, saving artifacts to disk."""
     typer.secho("Starting training run...", fg=typer.colors.GREEN)
@@ -193,9 +237,9 @@ def train(
 def predict(
     data_path: Path = typer.Argument(..., help="CSV containing games to score."),
     model_path: Path = typer.Argument(..., help="Trained model artifact path."),
-    output_dir: Path = typer.Option(Path("output/predictions"), help="Directory for prediction outputs."),
-    config: Optional[Path] = typer.Option(None, "--config", "-c", help="Optional config YAML path."),
-    odds_column: Optional[str] = typer.Option(None, "--odds-column", help="Column containing American odds."),
+    output_dir: Path = typer.Option(Path("output/predictions"), help="Directory for prediction outputs.", flag_value=UNSET),
+    config: Optional[Path] = typer.Option(None, "--config", "-c", help="Optional config YAML path.", flag_value=UNSET),
+    odds_column: Optional[str] = typer.Option(None, "--odds-column", help="Column containing American odds.", flag_value=UNSET),
 ) -> None:
     """Generate predictions and value bet recommendations."""
     typer.secho("Running inference...", fg=typer.colors.GREEN)
