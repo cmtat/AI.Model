@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from io import StringIO
 from pathlib import Path
 from typing import Dict, Iterable, Optional, Sequence
+import warnings
 
 import pandas as pd
 import requests
@@ -64,7 +65,24 @@ def load_weekly_player_stats(
     _require_nfl_data_py()
     from nfl_data_py import import_weekly_data
 
-    return import_weekly_data(list(seasons), columns=columns, downcast=downcast)
+    frames: List[pd.DataFrame] = []
+    failures: List[str] = []
+    for season in seasons:
+        try:
+            frames.append(import_weekly_data([season], columns=columns, downcast=downcast))
+        except Exception as exc:  # pragma: no cover - depends on remote availability
+            failures.append(f"{season}: {exc}")
+    if not frames:
+        raise DataSourceError(
+            f"Weekly data unavailable for requested seasons. Attempts: {failures}"
+        )
+    if failures:
+        warnings.warn(
+            "Some seasons were skipped while fetching weekly player stats:\n"
+            + "\n".join(failures)
+        )
+
+    return pd.concat(frames, ignore_index=True)
 
 
 def load_injuries(seasons: Sequence[int]) -> pd.DataFrame:
@@ -72,7 +90,23 @@ def load_injuries(seasons: Sequence[int]) -> pd.DataFrame:
     _require_nfl_data_py()
     from nfl_data_py import import_injuries
 
-    return import_injuries(list(seasons))
+    frames: List[pd.DataFrame] = []
+    failures: List[str] = []
+    for season in seasons:
+        try:
+            frames.append(import_injuries([season]))
+        except Exception as exc:  # pragma: no cover - remote availability
+            failures.append(f"{season}: {exc}")
+    if not frames:
+        raise DataSourceError(
+            f"Injury reports unavailable for requested seasons. Attempts: {failures}"
+        )
+    if failures:
+        warnings.warn(
+            "Some seasons were skipped while fetching injury reports:\n" + "\n".join(failures)
+        )
+
+    return pd.concat(frames, ignore_index=True)
 
 
 def load_team_metadata() -> pd.DataFrame:
@@ -88,7 +122,23 @@ def load_scoring_lines(seasons: Sequence[int]) -> pd.DataFrame:
     _require_nfl_data_py()
     from nfl_data_py import import_sc_lines
 
-    return import_sc_lines(list(seasons))
+    frames: List[pd.DataFrame] = []
+    failures: List[str] = []
+    for season in seasons:
+        try:
+            frames.append(import_sc_lines([season]))
+        except Exception as exc:  # pragma: no cover
+            failures.append(f"{season}: {exc}")
+    if not frames:
+        raise DataSourceError(
+            f"Scoring lines unavailable for requested seasons. Attempts: {failures}"
+        )
+    if failures:
+        warnings.warn(
+            "Some seasons were skipped while fetching scoring lines:\n" + "\n".join(failures)
+        )
+
+    return pd.concat(frames, ignore_index=True)
 
 
 def _fetch_csv_from_urls(urls: Sequence[str], context: str) -> pd.DataFrame:
