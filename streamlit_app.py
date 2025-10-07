@@ -174,6 +174,7 @@ with st.sidebar:
     mysportsfeeds_username = st.text_input("MySportsFeeds username")
     mysportsfeeds_password = st.text_input("MySportsFeeds password/token", type="password")
     weather_upload = st.file_uploader("Weather CSV (optional)", type=["csv"])
+    elo_upload = st.file_uploader("Elo snapshot CSV (optional)", type=["csv"])
     config_upload = st.file_uploader("Pipeline YAML config (optional)", type=["yaml", "yml"])
 
     st.markdown("---")
@@ -189,6 +190,18 @@ if train_end < train_start:
 raw_dir = Path(raw_dir_input).expanduser()
 artifact_root = Path(artifact_root_input).expanduser()
 fetch_seasons = list(range(int(train_start), int(max(train_end, target_season)) + 1))
+
+if elo_upload is not None:
+    try:
+        raw_dir.mkdir(parents=True, exist_ok=True)
+        elo_path = raw_dir / "elo.csv"
+        elo_path.write_bytes(elo_upload.getvalue())
+        st.session_state["elo_snapshot_path"] = str(elo_path)
+        st.sidebar.success(f"Elo snapshot saved to {elo_path}")
+    except Exception as exc:
+        st.sidebar.error(f"Failed to save Elo snapshot: {exc}")
+elif st.session_state.get("elo_snapshot_path"):
+    st.sidebar.caption(f"Elo snapshot available: {st.session_state['elo_snapshot_path']}")
 
 st.subheader("1️⃣ Fetch Data")
 st.write(
