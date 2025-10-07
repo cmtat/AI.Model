@@ -1,0 +1,49 @@
+name: Retrain NFL Model
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 12 * * 2"  # Tuesdays at 12:00 UTC
+
+jobs:
+  retrain:
+    runs-on: ubuntu-latest
+    env:
+      TRAINING_DATA_PATH: ""
+      PREDICTION_DATA_PATH: ""
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e ".[dev]"
+
+      - name: Run unit tests
+        run: python -m pytest
+
+      - name: Train model
+        env:
+          TRAINING_DATA_PATH: ${{ env.TRAINING_DATA_PATH }}
+        run: |
+          DATA_PATH="${TRAINING_DATA_PATH:-data/sample_games.csv}"
+          nfl-model train --data-path "$DATA_PATH" --output-dir output
+
+      - name: Generate predictions (optional)
+        if: env.PREDICTION_DATA_PATH != ''
+        env:
+          PREDICTION_DATA_PATH: ${{ env.PREDICTION_DATA_PATH }}
+        run: |
+          nfl-model predict --data-path "$PREDICTION_DATA_PATH" --model-path output/model.joblib --output-dir output/predictions
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: nfl-model-output
+          path: output
