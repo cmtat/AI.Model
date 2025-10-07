@@ -116,6 +116,22 @@ Use this CSV directly with `nfl-model train` or extend the script to append cust
    - `output/season_2025/model/` – model artifacts + metrics
    - `output/season_2025/predictions_2025/` – 2025 schedule scored by the trained model
 
+## Streamlit UI
+Prefer a graphical interface? Install the UI extras and launch Streamlit:
+
+1. **Install**
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate
+   pip install -e ".[dev,ingest,ui]"
+   ```
+2. **Run**
+   ```bash
+   streamlit run streamlit_app.py
+   ```
+
+The Streamlit workbench mirrors the CLI flow—configure seasons, optional API keys, and output locations in the sidebar, then step through fetching data, training, and generating predictions. Download buttons surface the resulting CSVs directly from the browser.
+
 ### Optional YAML Configuration
 Override defaults by supplying a YAML file via `--config`:
 ```yaml

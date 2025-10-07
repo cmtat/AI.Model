@@ -31,6 +31,9 @@ ingest = [
   "nfl-data-py>=0.3.3",
   "beautifulsoup4>=4.12,<5.0"
 ]
+ui = [
+  "streamlit>=1.37,<2.0"
+]
 
 [project.scripts]
 nfl-model = "nfl_model.cli:main"
