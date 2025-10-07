@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Sequence
 
 import pandas as pd
 from click.testing import CliRunner
@@ -8,41 +9,44 @@ from click.testing import CliRunner
 from nfl_model.cli import cli
 
 
-def _sample_dataset(season: int) -> pd.DataFrame:
-    return pd.DataFrame(
-        {
-            "game_id": [f"{season}_01_TEAM1_TEAM2"],
-            "season": [season],
-            "week": [1],
-            "gameday": ["2025-09-07"],
-            "home_team": ["TEAM1"],
-            "away_team": ["TEAM2"],
-            "home_score": [0],
-            "away_score": [0],
-            "home_team_win": [0.0],
-            "home_team_prev_win": [0.0],
-            "away_team_prev_win": [0.0],
-            "home_moneyline": [-110],
-            "away_moneyline": [110],
-            "home_spread": [-3.0],
-            "away_spread": [3.0],
-            "divisional_game": [0],
-            "home_rest": [7],
-            "away_rest": [7],
-            "temp": [70],
-            "wind": [5],
-            "closing_odds": [-110],
-            "elo_home_pre": [1550],
-            "elo_away_pre": [1500],
-            "elo_prob_home": [0.6],
-            "qbelo_prob_home": [0.59],
-        }
-    )
+def _sample_dataset(season: int, weeks: Sequence[int]) -> pd.DataFrame:
+    rows = []
+    for week in weeks:
+        rows.append(
+            {
+                "game_id": f"{season}_{week:02d}_TEAM1_TEAM2",
+                "season": season,
+                "week": week,
+                "gameday": "2025-09-07",
+                "home_team": "TEAM1",
+                "away_team": "TEAM2",
+                "home_score": 0,
+                "away_score": 0,
+                "home_team_win": 0.0,
+                "home_team_prev_win": 0.0,
+                "away_team_prev_win": 0.0,
+                "home_moneyline": -110,
+                "away_moneyline": 110,
+                "home_spread": -3.0,
+                "away_spread": 3.0,
+                "divisional_game": 0,
+                "home_rest": 7,
+                "away_rest": 7,
+                "temp": 70,
+                "wind": 5,
+                "closing_odds": -110,
+                "elo_home_pre": 1550,
+                "elo_away_pre": 1500,
+                "elo_prob_home": 0.6,
+                "qbelo_prob_home": 0.59,
+            }
+        )
+    return pd.DataFrame(rows)
 
 
 def test_season_run_workflow(monkeypatch, tmp_path):
-    training_df = _sample_dataset(2024)
-    target_df = _sample_dataset(2025)
+    training_df = _sample_dataset(2024, [1])
+    target_df = _sample_dataset(2025, [3, 5])
 
     def fake_build(raw_dir, seasons, game_types=None):
         if seasons == [2025]:
@@ -88,6 +92,8 @@ def test_season_run_workflow(monkeypatch, tmp_path):
             "2024",
             "--target-season",
             "2025",
+            "--target-week",
+            "5",
             "--raw-dir",
             str(tmp_path),
             "--artifact-dir",
@@ -96,6 +102,12 @@ def test_season_run_workflow(monkeypatch, tmp_path):
     )
 
     assert result.exit_code == 0, result.output
-    assert (artifacts_dir / "training_2023_2024.csv").exists()
+    training_csv = artifacts_dir / "training_2023_2024.csv"
+    assert training_csv.exists()
+    training_rows = pd.read_csv(training_csv)
+    # Includes one baseline row plus historical week (week 3 from target season)
+    assert len(training_rows) == 2
+    assert {3} == set(training_rows[training_rows["season"] == 2025]["week"])
     assert (artifacts_dir / "model" / "model.joblib").exists()
-    assert (artifacts_dir / "predictions_2025" / "predictions.csv").exists()
+    preds_csv = artifacts_dir / "predictions_2025" / "predictions.csv"
+    assert preds_csv.exists()

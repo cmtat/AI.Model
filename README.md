@@ -108,6 +108,7 @@ Use this CSV directly with `nfl-model train` or extend the script to append cust
      --train-start 2018 \
      --train-end 2024 \
      --target-season 2025 \
+     --target-week 5 \
      --raw-dir data/raw \
      --artifact-dir output/season_2025
    ```
@@ -141,6 +142,8 @@ The Streamlit workbench mirrors the CLI flow—configure seasons, optional API k
 > export QB_ELO_SNAPSHOT_PATH="/path/to/qb_elo_snapshot.csv"
 > ```
 > If you upload a CSV through the Streamlit sidebar, it is stored automatically in `data/raw/elo.csv` for future runs.
+
+Both the CLI and the Streamlit app now support an optional `target week`. When you supply it, predictions are filtered to that week and, by default, the training dataset is augmented with games from the target season that occurred earlier in the year (disable with `--exclude-target-history` or the Streamlit toggle).
 
 ### Optional YAML Configuration
 Override defaults by supplying a YAML file via `--config`:

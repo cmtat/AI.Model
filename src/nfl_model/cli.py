@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Iterable, List, Optional, Sequence
 
 import click
+import pandas as pd
 
 from . import pipeline
 from .dataset import build_modeling_dataset
@@ -323,6 +324,18 @@ def predict(
     default=None,
     help="Optional config YAML path for both training and prediction stages.",
 )
+@click.option(
+    "--target-week",
+    type=int,
+    default=None,
+    help="Specific week to score (1-23). If omitted, all games in the target season are scored.",
+)
+@click.option(
+    "--include-target-history/--exclude-target-history",
+    default=True,
+    show_default=True,
+    help="Include games from the target season that have already been played (weeks < target-week) in the training dataset.",
+)
 def season_run(
     train_start: int,
     train_end: int,
@@ -330,11 +343,15 @@ def season_run(
     raw_dir: Path,
     artifact_dir: Optional[Path],
     config: Optional[Path],
+    target_week: Optional[int],
+    include_target_history: bool,
 ) -> None:
     """Full-season workflow: prepare training data, train, and score a target season."""
 
     if train_end < train_start:
         raise click.BadParameter("--train-end must be greater than or equal to --train-start.")
+    if target_week is not None and not (1 <= target_week <= 23):
+        raise click.BadParameter("--target-week must be between 1 and 23.")
 
     seasons_train = list(range(train_start, train_end + 1))
     artifact_root = artifact_dir or Path(f"output/season_{target_season}")
@@ -345,10 +362,20 @@ def season_run(
         fg="green",
     )
     training_df = build_modeling_dataset(raw_dir, seasons=seasons_train)
+    target_history_df = pd.DataFrame()
+    if include_target_history and target_week is not None:
+        target_full = build_modeling_dataset(raw_dir, seasons=[target_season])
+        target_history_df = target_full[target_full["week"] < target_week]
+        if not target_history_df.empty:
+            training_df = (
+                pd.concat([training_df, target_history_df], ignore_index=True)
+                .drop_duplicates(subset="game_id", keep="last")
+            )
+
     if training_df.empty:
         raise click.ClickException(
             "Training dataset is empty. Ensure raw data covers the requested seasons."
-        )
+    )
     training_csv = artifact_root / f"training_{train_start}_{train_end}.csv"
     training_df.to_csv(training_csv, index=False)
 
@@ -359,6 +386,8 @@ def season_run(
 
     click.secho(f"Building scoring dataset for season {target_season}...", fg="green")
     scoring_df = build_modeling_dataset(raw_dir, seasons=[target_season])
+    if target_week is not None:
+        scoring_df = scoring_df[scoring_df["week"] == target_week]
     if scoring_df.empty:
         click.secho(
             f"No games found for season {target_season}. Skipping prediction step.", fg="yellow"

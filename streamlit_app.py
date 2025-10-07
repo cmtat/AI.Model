@@ -89,8 +89,14 @@ def run_training(
     seasons: Sequence[int],
     artifact_root: Path,
     config_path: Optional[Path],
+    target_history: Optional[pd.DataFrame] = None,
 ) -> Dict[str, object]:
     training_df = build_modeling_dataset(raw_dir, seasons=seasons)
+    if target_history is not None and not target_history.empty:
+        training_df = (
+            pd.concat([training_df, target_history], ignore_index=True)
+            .drop_duplicates(subset="game_id", keep="last")
+        )
     if training_df.empty:
         raise ValueError("Training dataset is empty. Check raw data availability.")
 
@@ -117,11 +123,14 @@ def run_training(
 def run_predictions(
     raw_dir: Path,
     target_season: int,
+    target_week: Optional[int],
     model_path: Path,
     output_dir: Path,
     config_path: Optional[Path],
 ) -> Dict[str, object]:
     scoring_df = build_modeling_dataset(raw_dir, seasons=[target_season])
+    if target_week is not None:
+        scoring_df = scoring_df[scoring_df["week"] == target_week]
     if scoring_df.empty:
         raise ValueError(f"No games found for season {target_season}.")
 
@@ -153,6 +162,17 @@ with st.sidebar:
     train_start = st.number_input("Training start season", min_value=1999, max_value=2100, value=2018, step=1)
     train_end = st.number_input("Training end season", min_value=1999, max_value=2100, value=2024, step=1)
     target_season = st.number_input("Target season to score", min_value=1999, max_value=2100, value=2025, step=1)
+    use_target_week = st.checkbox("Limit scoring to a specific week", value=True)
+    target_week_value: Optional[int] = (
+        int(st.number_input("Target week", min_value=1, max_value=23, value=5, step=1))
+        if use_target_week
+        else None
+    )
+    include_target_history = st.checkbox(
+        "Include already-played games from target season in training",
+        value=True,
+        help="Adds games with week less than the target week to the training dataset.",
+    )
 
     raw_dir_input = st.text_input("Raw data directory", value="data/raw")
     artifact_root_input = st.text_input(
@@ -251,12 +271,17 @@ if config_upload is not None:
 
 if st.button("Train model", type="primary"):
     try:
+        history_df: Optional[pd.DataFrame] = None
+        if include_target_history and target_week_value is not None:
+            target_full = build_modeling_dataset(raw_dir, seasons=[int(target_season)])
+            history_df = target_full[target_full["week"] < target_week_value]
         with st.spinner("Training model..."):
             training_result = run_training(
                 raw_dir=raw_dir,
                 seasons=list(range(int(train_start), int(train_end) + 1)),
                 artifact_root=_ensure_dir(artifact_root),
                 config_path=config_path,
+                target_history=history_df,
             )
         st.session_state["training_result"] = training_result
         st.success("Training complete.")
@@ -289,6 +314,7 @@ if st.button("Run predictions", type="primary"):
                 prediction_result = run_predictions(
                     raw_dir=raw_dir,
                     target_season=int(target_season),
+                    target_week=target_week_value if use_target_week else None,
                     model_path=training_result["model_path"],
                     output_dir=_ensure_dir(artifact_root / f"predictions_{target_season}"),
                     config_path=config_path,
